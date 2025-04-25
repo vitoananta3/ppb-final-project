@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import java.time.LocalDate
 import java.util.*
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.text.style.TextAlign
 
 data class Task(
     val id: Int,
@@ -296,18 +297,53 @@ fun HomeScreen() {
                 }
                 
                 // Tasks list
-                items(filteredTasks) { task ->
-                    TaskItem(
-                        task = task,
-                        onClick = {
-                            selectedTask = task
-                            showTaskDetailScreen = true
-                        },
-                        onDelete = {
-                            taskToDelete = task
-                            showDeleteDialog = true
+                if (filteredTasks.isEmpty()) {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 32.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.FilterAlt,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(48.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                )
+                                Text(
+                                    text = "No tasks found",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Text(
+                                    text = "Try changing your filters or create a new task",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                    textAlign = TextAlign.Center
+                                )
+                            }
                         }
-                    )
+                    }
+                } else {
+                    items(filteredTasks) { task ->
+                        TaskItem(
+                            task = task,
+                            onClick = {
+                                selectedTask = task
+                                showTaskDetailScreen = true
+                            },
+                            onDelete = {
+                                taskToDelete = task
+                                showDeleteDialog = true
+                            }
+                        )
+                    }
                 }
             }
 
