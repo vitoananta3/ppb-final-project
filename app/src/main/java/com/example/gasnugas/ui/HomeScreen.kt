@@ -767,12 +767,20 @@ fun TaskItem(
                     
                     Spacer(modifier = Modifier.height(8.dp))
                     
-                    // Tags
+                    // Tags with limited display
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        task.tags.forEach { tag ->
-                            TagChip(tag = tag)
+                        if (task.tags.size <= 2) {
+                            // Show all tags if 2 or fewer
+                            task.tags.forEach { tag ->
+                                TagChip(tag = tag)
+                            }
+                        } else {
+                            // Show only first 2 tags + "..." indicator
+                            TagChip(tag = task.tags[0])
+                            TagChip(tag = task.tags[1])
+                            TagChip(tag = "...")
                         }
                     }
                 }
@@ -812,8 +820,12 @@ fun TagChip(tag: String) {
         Text(
             text = tag,
             style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            modifier = Modifier
+                .padding(horizontal = 8.dp, vertical = 4.dp)
+                .widthIn(max = 120.dp),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
         )
     }
 }
