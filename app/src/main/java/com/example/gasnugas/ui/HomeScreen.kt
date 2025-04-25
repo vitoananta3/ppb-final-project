@@ -49,8 +49,8 @@ fun HomeScreen() {
     var selectedTask by remember { mutableStateOf<Task?>(null) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var taskToDelete by remember { mutableStateOf<Task?>(null) }
-    var statusFilter by remember { mutableStateOf<String?>(null) }
-    var tagFilter by remember { mutableStateOf<String?>(null) }
+    var statusFilter by remember { mutableStateOf("All") }
+    var tagFilter by remember { mutableStateOf("All") }
     var isNameSortAscendingSort by remember { mutableStateOf(true) }
     var isDeadlineSortAscendingSort by remember { mutableStateOf(true) }
 
@@ -240,9 +240,15 @@ fun HomeScreen() {
                         FilterButton(
                             modifier = Modifier.weight(1f),
                             tasks = tasks,
-                            onFiltered = { filtered -> 
-                                filteredTasks = filtered 
-                            }
+                            onFiltered = { filtered, status, tag, isNameSortAscending, isDeadlineSortAscending ->
+                                filteredTasks = filtered
+                                statusFilter = status
+                                tagFilter = tag
+                                isNameSortAscendingSort = isNameSortAscending
+                                isDeadlineSortAscendingSort = isDeadlineSortAscending
+                            },
+                            currentStatusFilter = statusFilter,
+                            currentTagFilter = tagFilter
                         )
                         
                         // Add button with updated onClick to show CreateTaskScreen
@@ -304,7 +310,9 @@ fun HomeScreen() {
                         // Close the dialog after applying the filter/sort
                         showSortFilterDialog = false
                     },
-                    tasks = tasks
+                    tasks = tasks,
+                    currentStatusFilter = statusFilter,
+                    currentTagFilter = tagFilter
                 )
             }
             
@@ -357,22 +365,24 @@ fun HomeScreen() {
 // Helper function to apply filters and sorting
 private fun applyFilters(
     tasks: List<Task>,
-    status: String?,
-    tag: String?,
+    status: String,
+    tag: String,
     isNameSortAscending: Boolean,
     isDeadlineSortAscending: Boolean
 ): List<Task> {
     var filtered = tasks
     
     // Apply status filter if not "All"
-    if (status != null && status != "All") {
+    if (status != "All") {
+        // Convert space to underscore for enum matching (e.g., "In Progress" -> "IN_PROGRESS")
+        val statusEnum = status.replace(" ", "_").uppercase()
         filtered = filtered.filter {
-            it.status.name.equals(status.replace(" ", "_"), ignoreCase = true)
+            it.status.name.equals(statusEnum, ignoreCase = true)
         }
     }
     
     // Apply tag filter if not "All"
-    if (tag != null && tag != "All") {
+    if (tag != "All") {
         filtered = filtered.filter { it.tags.contains(tag) }
     }
     
@@ -426,7 +436,9 @@ fun TaskStatusChip(count: Int, label: String, modifier: Modifier = Modifier) {
 fun FilterButton(
     modifier: Modifier = Modifier,
     tasks: List<Task>,
-    onFiltered: (List<Task>) -> Unit
+    onFiltered: (List<Task>, String, String, Boolean, Boolean) -> Unit,
+    currentStatusFilter: String = "All",
+    currentTagFilter: String = "All"
 ) {
     var showDialog by remember { mutableStateOf(false) }
 
@@ -438,8 +450,10 @@ fun FilterButton(
                 var filtered = tasks
 
                 if (status != "All") {
+                    // Convert space to underscore for enum matching (e.g., "In Progress" -> "IN_PROGRESS")
+                    val statusEnum = status.replace(" ", "_").uppercase()
                     filtered = filtered.filter {
-                        it.status.name.equals(status.replace(" ", "_"), ignoreCase = true)
+                        it.status.name.equals(statusEnum, ignoreCase = true)
                     }
                 }
 
@@ -460,10 +474,13 @@ fun FilterButton(
                     filtered.sortedByDescending { it.date }
                 }
 
-                onFiltered(filtered)
+                // Return filtered list and filter values to parent
+                onFiltered(filtered, status, tag, isNameSortAsc, isDeadlineSortAsc)
                 showDialog = false
             },
-            tasks = tasks
+            tasks = tasks,
+            currentStatusFilter = currentStatusFilter,
+            currentTagFilter = currentTagFilter
         )
     }
     
@@ -502,11 +519,13 @@ fun FilterButton(
 fun SortFilterDialog(
     onDismiss: () -> Unit,
     onApply: (String, String, Boolean, Boolean) -> Unit,
-    tasks: List<Task>? = null
+    tasks: List<Task>? = null,
+    currentStatusFilter: String = "All",
+    currentTagFilter: String = "All"
 ) {
-    // State for selected values
-    var selectedStatus by remember { mutableStateOf("All") }
-    var selectedTag by remember { mutableStateOf("All") }
+    // State for selected values, initialized with current filters
+    var selectedStatus by remember { mutableStateOf(currentStatusFilter) }
+    var selectedTag by remember { mutableStateOf(currentTagFilter) }
     
     // Sort direction state
     var isNameSortAscending by remember { mutableStateOf(true) }
@@ -610,12 +629,7 @@ fun SortFilterDialog(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(text = selectedStatus)
-                            // Icon to indicate dropdown
-                            Icon(
-                                imageVector = Icons.Default.ArrowUpward,
-                                contentDescription = "Dropdown",
-                                modifier = Modifier.rotate(if (showStatusMenu) 180f else 0f)
-                            )
+                            // Removed arrow icon
                         }
                         
                         DropdownMenu(
@@ -661,12 +675,7 @@ fun SortFilterDialog(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(text = selectedTag)
-                            // Icon to indicate dropdown
-                            Icon(
-                                imageVector = Icons.Default.ArrowUpward,
-                                contentDescription = "Dropdown",
-                                modifier = Modifier.rotate(if (showTagMenu) 180f else 0f)
-                            )
+                            // Removed arrow icon
                         }
                         
                         DropdownMenu(
