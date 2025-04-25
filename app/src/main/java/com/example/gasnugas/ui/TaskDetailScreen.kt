@@ -100,6 +100,7 @@ fun TaskDetailScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable { showDatePicker = true },
+                    enabled = false,
                     readOnly = true,
                     placeholder = { Text("Select date") },
                     shape = MaterialTheme.shapes.small,
@@ -109,7 +110,7 @@ fun TaskDetailScreen(
                             imageVector = Icons.Default.DateRange,
                             contentDescription = "Calendar"
                         )
-                    }
+                    },
                 )
                 
                 if (showDatePicker) {
