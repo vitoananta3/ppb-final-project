@@ -13,9 +13,11 @@ import androidx.compose.material.icons.outlined.FilterAlt
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,6 +49,11 @@ fun HomeScreen() {
     var selectedTask by remember { mutableStateOf<Task?>(null) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var taskToDelete by remember { mutableStateOf<Task?>(null) }
+    var statusFilter by remember { mutableStateOf<String?>(null) }
+    var tagFilter by remember { mutableStateOf<String?>(null) }
+    var isNameSortAscendingSort by remember { mutableStateOf(true) }
+    var isDeadlineSortAscendingSort by remember { mutableStateOf(true) }
+
     var tasks by remember { 
         mutableStateOf(listOf(
             Task(1, "Evaluasi Tengah Semester", LocalDate.of(2025, 4, 23), listOf("PPB", "Campus"), TaskStatus.IN_PROGRESS),
@@ -56,6 +63,8 @@ fun HomeScreen() {
             Task(5, "Mengambil Laundry", LocalDate.of(2025, 4, 24), listOf("PPL"), TaskStatus.BACKLOG)
         )) 
     }
+    var filteredTasks by remember { mutableStateOf<List<Task>>(tasks) }
+
     val today = LocalDate.of(2025, 4, 23)
     val dayOfWeek = today.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, Locale.ENGLISH)
     val monthName = today.month.getDisplayName(java.time.format.TextStyle.FULL, Locale.ENGLISH)
@@ -224,7 +233,11 @@ fun HomeScreen() {
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        FilterButton(modifier = Modifier.weight(1f))
+                        FilterButton(
+                            modifier = Modifier.weight(1f),
+                            tasks = tasks,
+                            onFiltered = { filtered -> filteredTasks = filtered }
+                        )
                         
                         // Add button with updated onClick to show CreateTaskScreen
                         Card(
@@ -254,7 +267,7 @@ fun HomeScreen() {
                 }
                 
                 // Tasks list
-                items(tasks) { task ->
+                items(filteredTasks) { task ->
                     TaskItem(
                         task = task,
                         onClick = {
@@ -272,10 +285,15 @@ fun HomeScreen() {
             // Add this to show the dialog when showSortFilterDialog is true
             if (showSortFilterDialog) {
                 SortFilterDialog(
+
                     onDismiss = { showSortFilterDialog = false },
-                    onApply = { /* Apply filters and sorting logic will be implemented later */ 
-                        showSortFilterDialog = false 
+                    onApply = { status, tag, isNameSortAscending, isDeadlineSortAscending ->
+
+                        println("lah masuk sini dia kimau")
+                        // Close the dialog after applying the filter/sort
+                        showSortFilterDialog = false
                     }
+
                 )
             }
             
@@ -353,13 +371,46 @@ fun TaskStatusChip(count: Int, label: String, modifier: Modifier = Modifier) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FilterButton(modifier: Modifier = Modifier) {
+fun FilterButton(
+    modifier: Modifier = Modifier,
+    tasks: List<Task>,
+    onFiltered: (List<Task>) -> Unit
+) {
     var showDialog by remember { mutableStateOf(false) }
-    
+
     if (showDialog) {
         SortFilterDialog(
             onDismiss = { showDialog = false },
-            onApply = { /* Apply filters here */ showDialog = false }
+            onApply = { status, tag, isNameSortAsc, isDeadlineSortAsc ->
+                // 1. Filter
+                var filtered = tasks
+
+                if (status != "All") {
+                    filtered = filtered.filter {
+                        it.status.name.equals(status.replace(" ", "_"), ignoreCase = true)
+                    }
+                }
+
+                if (tag != "All") {
+                    filtered = filtered.filter { it.tags.contains(tag) }
+                }
+
+                // 2. Sort
+                filtered = if (isNameSortAsc) {
+                    filtered.sortedBy { it.title.lowercase() }
+                } else {
+                    filtered.sortedByDescending { it.title.lowercase() }
+                }
+
+                filtered = if (isDeadlineSortAsc) {
+                    filtered.sortedBy { it.date }
+                } else {
+                    filtered.sortedByDescending { it.date }
+                }
+
+                onFiltered(filtered)
+                showDialog = false
+            }
         )
     }
     
@@ -397,7 +448,7 @@ fun FilterButton(modifier: Modifier = Modifier) {
 @Composable
 fun SortFilterDialog(
     onDismiss: () -> Unit,
-    onApply: () -> Unit
+    onApply: (String, String, Boolean, Boolean) -> Unit
 ) {
     // State for selected values
     var selectedStatus by remember { mutableStateOf("All") }
@@ -568,7 +619,9 @@ fun SortFilterDialog(
         },
         confirmButton = {
             Button(
-                onClick = onApply
+                onClick = {
+                    onApply(selectedStatus, selectedTag, isNameSortAscending, isDeadlineSortAscending)
+                }
             ) {
                 Text("Apply")
             }
