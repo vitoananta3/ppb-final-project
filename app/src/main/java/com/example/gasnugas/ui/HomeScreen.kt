@@ -53,6 +53,7 @@ fun HomeScreen() {
     var tagFilter by remember { mutableStateOf("All") }
     var isNameSortAscendingSort by remember { mutableStateOf(true) }
     var isDeadlineSortAscendingSort by remember { mutableStateOf(true) }
+    var selectedSortOption by remember { mutableStateOf("Deadline") }
 
     var tasks by remember { 
         mutableStateOf(listOf(
@@ -63,7 +64,19 @@ fun HomeScreen() {
             Task(5, "Mengambil Laundry", LocalDate.of(2025, 4, 24), listOf("PPL"), TaskStatus.BACKLOG)
         )) 
     }
-    var filteredTasks by remember { mutableStateOf<List<Task>>(tasks) }
+    // Initialize filtered tasks with proper sorting based on default sort settings
+    var filteredTasks by remember { 
+        mutableStateOf(
+            applyFilters(
+                tasks, 
+                statusFilter, 
+                tagFilter, 
+                isNameSortAscendingSort, 
+                isDeadlineSortAscendingSort, 
+                selectedSortOption
+            )
+        ) 
+    }
 
     val today = LocalDate.of(2025, 4, 23)
     val dayOfWeek = today.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, Locale.ENGLISH)
@@ -97,7 +110,7 @@ fun HomeScreen() {
                 
                 tasks = tasks + newTask
                 // Update filtered tasks after adding a new task
-                filteredTasks = applyFilters(tasks, statusFilter, tagFilter, isNameSortAscendingSort, isDeadlineSortAscendingSort)
+                filteredTasks = applyFilters(tasks, statusFilter, tagFilter, isNameSortAscendingSort, isDeadlineSortAscendingSort, selectedSortOption)
             }
         )
     } else if (showTaskDetailScreen && selectedTask != null) {
@@ -129,7 +142,7 @@ fun HomeScreen() {
                 }
                 tasks = updatedTasks
                 // Update filtered tasks after updating a task
-                filteredTasks = applyFilters(tasks, statusFilter, tagFilter, isNameSortAscendingSort, isDeadlineSortAscendingSort)
+                filteredTasks = applyFilters(tasks, statusFilter, tagFilter, isNameSortAscendingSort, isDeadlineSortAscendingSort, selectedSortOption)
             }
         )
     } else {
@@ -240,15 +253,19 @@ fun HomeScreen() {
                         FilterButton(
                             modifier = Modifier.weight(1f),
                             tasks = tasks,
-                            onFiltered = { filtered, status, tag, isNameSortAscending, isDeadlineSortAscending ->
+                            onFiltered = { filtered, status, tag, isNameSortAscending, isDeadlineSortAscending, sortOption ->
                                 filteredTasks = filtered
                                 statusFilter = status
                                 tagFilter = tag
                                 isNameSortAscendingSort = isNameSortAscending
                                 isDeadlineSortAscendingSort = isDeadlineSortAscending
+                                selectedSortOption = sortOption
                             },
                             currentStatusFilter = statusFilter,
-                            currentTagFilter = tagFilter
+                            currentTagFilter = tagFilter,
+                            isNameSortAscending = isNameSortAscendingSort,
+                            isDeadlineSortAscending = isDeadlineSortAscendingSort,
+                            currentSortOption = selectedSortOption
                         )
                         
                         // Add button with updated onClick to show CreateTaskScreen
@@ -298,21 +315,27 @@ fun HomeScreen() {
             if (showSortFilterDialog) {
                 SortFilterDialog(
                     onDismiss = { showSortFilterDialog = false },
-                    onApply = { status, tag, isNameSortAscending, isDeadlineSortAscending ->
+                    onApply = { status, tag, isNameSortAscending, isDeadlineSortAscending, sortOption ->
                         statusFilter = status
                         tagFilter = tag
                         isNameSortAscendingSort = isNameSortAscending
                         isDeadlineSortAscendingSort = isDeadlineSortAscending
                         
                         // Apply filters and sorting
-                        filteredTasks = applyFilters(tasks, status, tag, isNameSortAscending, isDeadlineSortAscending)
+                        filteredTasks = applyFilters(tasks, status, tag, isNameSortAscending, isDeadlineSortAscending, sortOption)
+                        
+                        // Update selected sort option based on which one is actively being used
+                        selectedSortOption = sortOption
                         
                         // Close the dialog after applying the filter/sort
                         showSortFilterDialog = false
                     },
                     tasks = tasks,
                     currentStatusFilter = statusFilter,
-                    currentTagFilter = tagFilter
+                    currentTagFilter = tagFilter,
+                    isNameSortAscending = isNameSortAscendingSort,
+                    isDeadlineSortAscending = isDeadlineSortAscendingSort,
+                    currentSortOption = selectedSortOption
                 )
             }
             
@@ -335,7 +358,7 @@ fun HomeScreen() {
                             onClick = {
                                 tasks = tasks.filter { it.id != taskToDelete?.id }
                                 // Update filtered tasks after deleting a task
-                                filteredTasks = applyFilters(tasks, statusFilter, tagFilter, isNameSortAscendingSort, isDeadlineSortAscendingSort)
+                                filteredTasks = applyFilters(tasks, statusFilter, tagFilter, isNameSortAscendingSort, isDeadlineSortAscendingSort, selectedSortOption)
                                 showDeleteDialog = false
                                 taskToDelete = null
                             },
@@ -368,7 +391,8 @@ private fun applyFilters(
     status: String,
     tag: String,
     isNameSortAscending: Boolean,
-    isDeadlineSortAscending: Boolean
+    isDeadlineSortAscending: Boolean,
+    sortOption: String = "Deadline"
 ): List<Task> {
     var filtered = tasks
     
@@ -386,18 +410,19 @@ private fun applyFilters(
         filtered = filtered.filter { it.tags.contains(tag) }
     }
     
-    // Apply name sorting
-    filtered = if (isNameSortAscending) {
-        filtered.sortedBy { it.title.lowercase() }
-    } else {
-        filtered.sortedByDescending { it.title.lowercase() }
-    }
-    
-    // Apply deadline sorting
-    filtered = if (isDeadlineSortAscending) {
-        filtered.sortedBy { it.date }
-    } else {
-        filtered.sortedByDescending { it.date }
+    // Apply sorting based on selected sort option
+    filtered = if (sortOption == "Name") {
+        if (isNameSortAscending) {
+            filtered.sortedBy { it.title.lowercase() }
+        } else {
+            filtered.sortedByDescending { it.title.lowercase() }
+        }
+    } else { // Deadline sort
+        if (isDeadlineSortAscending) {
+            filtered.sortedBy { it.date }
+        } else {
+            filtered.sortedByDescending { it.date }
+        }
     }
     
     return filtered
@@ -436,16 +461,19 @@ fun TaskStatusChip(count: Int, label: String, modifier: Modifier = Modifier) {
 fun FilterButton(
     modifier: Modifier = Modifier,
     tasks: List<Task>,
-    onFiltered: (List<Task>, String, String, Boolean, Boolean) -> Unit,
+    onFiltered: (List<Task>, String, String, Boolean, Boolean, String) -> Unit,
     currentStatusFilter: String = "All",
-    currentTagFilter: String = "All"
+    currentTagFilter: String = "All",
+    isNameSortAscending: Boolean = true,
+    isDeadlineSortAscending: Boolean = true,
+    currentSortOption: String = "Deadline"
 ) {
     var showDialog by remember { mutableStateOf(false) }
 
     if (showDialog) {
         SortFilterDialog(
             onDismiss = { showDialog = false },
-            onApply = { status, tag, isNameSortAsc, isDeadlineSortAsc ->
+            onApply = { status, tag, isNameSortAsc, isDeadlineSortAsc, sortOption ->
                 // 1. Filter
                 var filtered = tasks
 
@@ -475,12 +503,15 @@ fun FilterButton(
                 }
 
                 // Return filtered list and filter values to parent
-                onFiltered(filtered, status, tag, isNameSortAsc, isDeadlineSortAsc)
+                onFiltered(filtered, status, tag, isNameSortAsc, isDeadlineSortAsc, sortOption)
                 showDialog = false
             },
             tasks = tasks,
             currentStatusFilter = currentStatusFilter,
-            currentTagFilter = currentTagFilter
+            currentTagFilter = currentTagFilter,
+            isNameSortAscending = isNameSortAscending,
+            isDeadlineSortAscending = isDeadlineSortAscending,
+            currentSortOption = currentSortOption
         )
     }
     
@@ -518,18 +549,24 @@ fun FilterButton(
 @Composable
 fun SortFilterDialog(
     onDismiss: () -> Unit,
-    onApply: (String, String, Boolean, Boolean) -> Unit,
+    onApply: (String, String, Boolean, Boolean, String) -> Unit,
     tasks: List<Task>? = null,
     currentStatusFilter: String = "All",
-    currentTagFilter: String = "All"
+    currentTagFilter: String = "All",
+    isNameSortAscending: Boolean = true,
+    isDeadlineSortAscending: Boolean = true,
+    currentSortOption: String = "Deadline"
 ) {
     // State for selected values, initialized with current filters
     var selectedStatus by remember { mutableStateOf(currentStatusFilter) }
     var selectedTag by remember { mutableStateOf(currentTagFilter) }
     
-    // Sort direction state
-    var isNameSortAscending by remember { mutableStateOf(true) }
-    var isDeadlineSortAscending by remember { mutableStateOf(true) }
+    // Sort direction state initialized with current values
+    var isNameSortAscending by remember { mutableStateOf(isNameSortAscending) }
+    var isDeadlineSortAscending by remember { mutableStateOf(isDeadlineSortAscending) }
+    
+    // Remember the currently selected sort option
+    var selectedSortOption by remember { mutableStateOf(currentSortOption) }
     
     // Available options
     val statusOptions = listOf("All", "Backlog", "In Progress", "Done")
@@ -569,7 +606,6 @@ fun SortFilterDialog(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     val sortOptions = listOf("Name", "Deadline")
-                    var selectedSortOption by remember { mutableStateOf(sortOptions[1]) }
                     
                     sortOptions.forEach { option ->
                         FilterChip(
@@ -702,7 +738,7 @@ fun SortFilterDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    onApply(selectedStatus, selectedTag, isNameSortAscending, isDeadlineSortAscending)
+                    onApply(selectedStatus, selectedTag, isNameSortAscending, isDeadlineSortAscending, selectedSortOption)
                 }
             ) {
                 Text("Apply")
