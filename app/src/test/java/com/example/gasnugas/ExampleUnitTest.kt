@@ -1,4 +1,4 @@
-package com.example.ets
+package com.example.gasnugas
 
 import org.junit.Test
 

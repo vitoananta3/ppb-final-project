@@ -1,4 +1,4 @@
-package com.example.ets.ui.theme
+package com.example.gasnugas.ui.theme
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle

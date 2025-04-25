@@ -19,6 +19,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "ets"
+rootProject.name = "gasnugas"
 include(":app")
- 

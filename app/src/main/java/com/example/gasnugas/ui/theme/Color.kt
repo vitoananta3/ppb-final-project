@@ -1,4 +1,4 @@
-package com.example.ets.ui.theme
+package com.example.gasnugas.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
