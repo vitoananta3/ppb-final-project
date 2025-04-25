@@ -320,12 +320,10 @@ fun HomeScreen() {
                         tagFilter = tag
                         isNameSortAscendingSort = isNameSortAscending
                         isDeadlineSortAscendingSort = isDeadlineSortAscending
+                        selectedSortOption = sortOption
                         
                         // Apply filters and sorting
                         filteredTasks = applyFilters(tasks, status, tag, isNameSortAscending, isDeadlineSortAscending, sortOption)
-                        
-                        // Update selected sort option based on which one is actively being used
-                        selectedSortOption = sortOption
                         
                         // Close the dialog after applying the filter/sort
                         showSortFilterDialog = false
@@ -411,17 +409,20 @@ private fun applyFilters(
     }
     
     // Apply sorting based on selected sort option
-    filtered = if (sortOption == "Name") {
-        if (isNameSortAscending) {
-            filtered.sortedBy { it.title.lowercase() }
-        } else {
-            filtered.sortedByDescending { it.title.lowercase() }
+    filtered = when (sortOption) {
+        "Name" -> {
+            if (isNameSortAscending) {
+                filtered.sortedBy { it.title.lowercase() }
+            } else {
+                filtered.sortedByDescending { it.title.lowercase() }
+            }
         }
-    } else { // Deadline sort
-        if (isDeadlineSortAscending) {
-            filtered.sortedBy { it.date }
-        } else {
-            filtered.sortedByDescending { it.date }
+        else -> { // "Deadline" or any other default
+            if (isDeadlineSortAscending) {
+                filtered.sortedBy { it.date }
+            } else {
+                filtered.sortedByDescending { it.date }
+            }
         }
     }
     
@@ -474,35 +475,17 @@ fun FilterButton(
         SortFilterDialog(
             onDismiss = { showDialog = false },
             onApply = { status, tag, isNameSortAsc, isDeadlineSortAsc, sortOption ->
-                // 1. Filter
-                var filtered = tasks
+                // Apply filters and sorting directly using the applyFilters function
+                val filtered = applyFilters(
+                    tasks, 
+                    status, 
+                    tag, 
+                    isNameSortAsc, 
+                    isDeadlineSortAsc, 
+                    sortOption
+                )
 
-                if (status != "All") {
-                    // Convert space to underscore for enum matching (e.g., "In Progress" -> "IN_PROGRESS")
-                    val statusEnum = status.replace(" ", "_").uppercase()
-                    filtered = filtered.filter {
-                        it.status.name.equals(statusEnum, ignoreCase = true)
-                    }
-                }
-
-                if (tag != "All") {
-                    filtered = filtered.filter { it.tags.contains(tag) }
-                }
-
-                // 2. Sort
-                filtered = if (isNameSortAsc) {
-                    filtered.sortedBy { it.title.lowercase() }
-                } else {
-                    filtered.sortedByDescending { it.title.lowercase() }
-                }
-
-                filtered = if (isDeadlineSortAsc) {
-                    filtered.sortedBy { it.date }
-                } else {
-                    filtered.sortedByDescending { it.date }
-                }
-
-                // Return filtered list and filter values to parent
+                // Return filtered list and all filter/sort values to parent
                 onFiltered(filtered, status, tag, isNameSortAsc, isDeadlineSortAsc, sortOption)
                 showDialog = false
             },
