@@ -92,6 +92,7 @@ fun CreateTaskScreen(
                         .fillMaxWidth()
                         .clickable { showDatePicker = true },
                     readOnly = true,
+                    enabled = false,
                     placeholder = { Text("Select date") },
                     shape = MaterialTheme.shapes.small,
                     leadingIcon = {
