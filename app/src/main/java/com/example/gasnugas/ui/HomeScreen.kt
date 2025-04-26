@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import java.time.LocalDate
 import java.util.*
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 
 data class Task(
@@ -55,15 +56,10 @@ fun HomeScreen() {
     var isNameSortAscendingSort by remember { mutableStateOf(true) }
     var isDeadlineSortAscendingSort by remember { mutableStateOf(true) }
     var selectedSortOption by remember { mutableStateOf("Deadline") }
+    val context = LocalContext.current
 
     var tasks by remember { 
-        mutableStateOf(listOf(
-            Task(1, "Evaluasi Tengah Semester", LocalDate.of(2025, 4, 23), listOf("PPB", "Campus"), TaskStatus.IN_PROGRESS),
-            Task(2, "Tugas 4 - Aplikasi Ulang Tahun", LocalDate.of(2025, 4, 8), listOf("PPB"), TaskStatus.DONE),
-            Task(3, "ETS", LocalDate.of(2025, 4, 26), listOf("PPL"), TaskStatus.DONE),
-            Task(4, "Tugas 2 - Design UI/UX", LocalDate.of(2025, 4, 22), listOf("PPL"), TaskStatus.DONE),
-            Task(5, "Mengambil Laundry", LocalDate.of(2025, 4, 24), listOf("PPL"), TaskStatus.BACKLOG)
-        )) 
+        mutableStateOf(loadTasksFromFileIfNeeded(context))
     }
     // Initialize filtered tasks with proper sorting based on default sort settings
     var filteredTasks by remember { 
@@ -110,6 +106,7 @@ fun HomeScreen() {
                 )
                 
                 tasks = tasks + newTask
+                upsertTask(context, newTask)
                 // Update filtered tasks after adding a new task
                 filteredTasks = applyFilters(tasks, statusFilter, tagFilter, isNameSortAscendingSort, isDeadlineSortAscendingSort, selectedSortOption)
             }
@@ -122,6 +119,7 @@ fun HomeScreen() {
                 selectedTask = null
             },
             onSaveTask = { name, date, status, tags ->
+                var newSelectedTask: Task? = null
                 val updatedTasks = tasks.map { task ->
                     if (task.id == selectedTask?.id) {
                         val taskStatus = when (status) {
@@ -130,18 +128,22 @@ fun HomeScreen() {
                             "Done" -> TaskStatus.DONE
                             else -> TaskStatus.BACKLOG
                         }
-                        
-                        task.copy(
+
+                        val updated = task.copy(
                             title = name,
                             date = date ?: task.date,
                             tags = tags,
                             status = taskStatus
                         )
+                        newSelectedTask = updated
+                        updated
                     } else {
                         task
                     }
                 }
+                newSelectedTask?.let { upsertTask(context, it) }
                 tasks = updatedTasks
+
                 // Update filtered tasks after updating a task
                 filteredTasks = applyFilters(tasks, statusFilter, tagFilter, isNameSortAscendingSort, isDeadlineSortAscendingSort, selectedSortOption)
             }
@@ -391,6 +393,7 @@ fun HomeScreen() {
                         TextButton(
                             onClick = {
                                 tasks = tasks.filter { it.id != taskToDelete?.id }
+                                taskToDelete?.let { deleteTask(context, it) }
                                 // Update filtered tasks after deleting a task
                                 filteredTasks = applyFilters(tasks, statusFilter, tagFilter, isNameSortAscendingSort, isDeadlineSortAscendingSort, selectedSortOption)
                                 showDeleteDialog = false
