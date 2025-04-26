@@ -46,7 +46,7 @@ fun deleteTask(context: Context, task: Task) {
 }
 
 
-fun loadTasksFromFileIfNeeded(context: Context): List<Task> {
+fun loadTasksFromFileIfNeeded(context: Context, isDebug: Boolean = false): List<Task> {
     val file = File(context.filesDir, "tasks.txt")
 
     return if (file.exists() && file.length() > 0) {
@@ -54,10 +54,21 @@ fun loadTasksFromFileIfNeeded(context: Context): List<Task> {
         loadTasksFromFile(context)
     } else {
         // If file doesn't exist or is empty, initialize mock data
-        initMock(context)
-        emptyList() // Return an empty list temporarily until tasks are loaded
+        if(isDebug){
+            initMock(context)
+        }
+        else {
+            initFile(context)
+        }
+        loadTasksFromFile(context)
     }
 }
+
+fun initFile(context: Context) {
+    val fileOutput = context.openFileOutput("tasks.txt", Context.MODE_PRIVATE)
+    fileOutput.use { /* just create an empty file */ }
+}
+
 
 fun initMock(context: Context) {
     val mockTasks = listOf(
