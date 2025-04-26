@@ -75,7 +75,7 @@ fun HomeScreen() {
         ) 
     }
 
-    val today = LocalDate.of(2025, 4, 23)
+    val today = LocalDate.now()
     val dayOfWeek = today.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, Locale.ENGLISH)
     val monthName = today.month.getDisplayName(java.time.format.TextStyle.FULL, Locale.ENGLISH)
     
