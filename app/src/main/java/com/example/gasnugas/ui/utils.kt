@@ -4,6 +4,19 @@ import android.content.Context
 import java.io.File
 import java.time.LocalDate
 
+// UI Domain models - shared across the app
+data class Task(
+    val id: Int,
+    val title: String,
+    val date: LocalDate,
+    val tags: List<String>,
+    val status: TaskStatus
+)
+
+enum class TaskStatus {
+    BACKLOG, IN_PROGRESS, DONE
+}
+
 fun saveTasksToFile(context: Context, tasks: List<Task>) {
     val fileOutput = context.openFileOutput("tasks.txt", Context.MODE_PRIVATE)
     fileOutput.bufferedWriter().use { writer ->

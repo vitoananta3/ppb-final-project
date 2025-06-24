@@ -11,14 +11,16 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.FilterAlt
 import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.ExitToApp
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
@@ -30,22 +32,17 @@ import java.util.*
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
-
-data class Task(
-    val id: Int,
-    val title: String,
-    val date: LocalDate,
-    val tags: List<String>,
-    val status: TaskStatus
-)
-
-enum class TaskStatus {
-    BACKLOG, IN_PROGRESS, DONE
-}
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.gasnugas.ui.auth.AuthViewModel
+import com.example.gasnugas.ui.viewmodel.TaskViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen() {
+fun HomeScreen(
+    authViewModel: AuthViewModel,
+    onLogout: () -> Unit,
+    taskViewModel: TaskViewModel = viewModel()
+) {
     var showCreateTaskScreen by remember { mutableStateOf(false) }
     var showTaskDetailScreen by remember { mutableStateOf(false) }
     var selectedTask by remember { mutableStateOf<Task?>(null) }
@@ -56,32 +53,28 @@ fun HomeScreen() {
     var isNameSortAscendingSort by remember { mutableStateOf(true) }
     var isDeadlineSortAscendingSort by remember { mutableStateOf(true) }
     var selectedSortOption by remember { mutableStateOf("Deadline") }
+    var showUserMenu by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
-    var tasks by remember { 
-        mutableStateOf(loadTasksFromFileIfNeeded(context))
-    }
-    // Initialize filtered tasks with proper sorting based on default sort settings
-    var filteredTasks by remember { 
-        mutableStateOf(
-            applyFilters(
-                tasks, 
-                statusFilter, 
-                tagFilter, 
-                isNameSortAscendingSort, 
-                isDeadlineSortAscendingSort, 
-                selectedSortOption
-            )
-        ) 
+    // Get current user
+    val currentUser by authViewModel.currentUser.collectAsState(initial = null)
+    val currentUserId = currentUser?.id ?: return
+    
+    // Get tasks from Room database
+    val allTasks by taskViewModel.getTasksByUser(currentUserId).collectAsState(initial = emptyList())
+    
+    // Apply filters to tasks
+    val filteredTasks = remember(allTasks, statusFilter, tagFilter, isNameSortAscendingSort, isDeadlineSortAscendingSort, selectedSortOption) {
+        applyTaskFilters(allTasks, statusFilter, tagFilter, isNameSortAscendingSort, isDeadlineSortAscendingSort, selectedSortOption)
     }
 
     val today = LocalDate.now()
     val dayOfWeek = today.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, Locale.ENGLISH)
     val monthName = today.month.getDisplayName(java.time.format.TextStyle.FULL, Locale.ENGLISH)
     
-    val backlogCount = tasks.count { it.status == TaskStatus.BACKLOG }
-    val inProgressCount = tasks.count { it.status == TaskStatus.IN_PROGRESS }
-    val doneCount = tasks.count { it.status == TaskStatus.DONE }
+    val backlogCount = allTasks.count { task -> task.status == TaskStatus.BACKLOG }
+    val inProgressCount = allTasks.count { task -> task.status == TaskStatus.IN_PROGRESS }
+    val doneCount = allTasks.count { task -> task.status == TaskStatus.DONE }
 
     var showSortFilterDialog by remember { mutableStateOf(false) }
 
@@ -89,7 +82,6 @@ fun HomeScreen() {
         CreateTaskScreen(
             onNavigateBack = { showCreateTaskScreen = false },
             onCreateTask = { name, date, status, tags ->
-                val newTaskId = tasks.maxOfOrNull { task -> task.id }?.plus(1) ?: 1
                 val taskStatus = when (status) {
                     "Backlog" -> TaskStatus.BACKLOG
                     "In Progress" -> TaskStatus.IN_PROGRESS
@@ -98,17 +90,14 @@ fun HomeScreen() {
                 }
                 
                 val newTask = Task(
-                    id = newTaskId,
+                    id = 0, // Room will auto-generate
                     title = name,
                     date = date ?: LocalDate.now(),
                     tags = tags,
                     status = taskStatus
                 )
                 
-                tasks = tasks + newTask
-                upsertTask(context, newTask)
-                // Update filtered tasks after adding a new task
-                filteredTasks = applyFilters(tasks, statusFilter, tagFilter, isNameSortAscendingSort, isDeadlineSortAscendingSort, selectedSortOption)
+                taskViewModel.insertTask(newTask, currentUserId)
             }
         )
     } else if (showTaskDetailScreen && selectedTask != null) {
@@ -119,33 +108,23 @@ fun HomeScreen() {
                 selectedTask = null
             },
             onSaveTask = { name, date, status, tags ->
-                var newSelectedTask: Task? = null
-                val updatedTasks = tasks.map { task ->
-                    if (task.id == selectedTask?.id) {
-                        val taskStatus = when (status) {
-                            "Backlog" -> TaskStatus.BACKLOG
-                            "In Progress" -> TaskStatus.IN_PROGRESS
-                            "Done" -> TaskStatus.DONE
-                            else -> TaskStatus.BACKLOG
-                        }
-
-                        val updated = task.copy(
-                            title = name,
-                            date = date ?: task.date,
-                            tags = tags,
-                            status = taskStatus
-                        )
-                        newSelectedTask = updated
-                        updated
-                    } else {
-                        task
+                selectedTask?.let { task ->
+                    val taskStatus = when (status) {
+                        "Backlog" -> TaskStatus.BACKLOG
+                        "In Progress" -> TaskStatus.IN_PROGRESS
+                        "Done" -> TaskStatus.DONE
+                        else -> TaskStatus.BACKLOG
                     }
-                }
-                newSelectedTask?.let { upsertTask(context, it) }
-                tasks = updatedTasks
 
-                // Update filtered tasks after updating a task
-                filteredTasks = applyFilters(tasks, statusFilter, tagFilter, isNameSortAscendingSort, isDeadlineSortAscendingSort, selectedSortOption)
+                    val updatedTask = task.copy(
+                        title = name,
+                        date = date ?: task.date,
+                        tags = tags,
+                        status = taskStatus
+                    )
+                    
+                    taskViewModel.updateTask(updatedTask, currentUserId)
+                }
             }
         )
     } else {
@@ -190,6 +169,61 @@ fun HomeScreen() {
                             }
                         }
                     },
+                    actions = {
+                        // User menu
+                        Box {
+                            IconButton(onClick = { showUserMenu = true }) {
+                                Icon(
+                                    imageVector = Icons.Default.Person,
+                                    contentDescription = "User Menu",
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                            
+                            DropdownMenu(
+                                expanded = showUserMenu,
+                                onDismissRequest = { showUserMenu = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { 
+                                        Column {
+                                            Text(
+                                                text = currentUser?.name ?: "",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                fontWeight = FontWeight.Medium
+                                            )
+                                            Text(
+                                                text = currentUser?.email ?: "",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    },
+                                    onClick = { }
+                                )
+                                HorizontalDivider()
+                                DropdownMenuItem(
+                                    text = { 
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.ExitToApp,
+                                                contentDescription = "Logout",
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text("Logout")
+                                        }
+                                    },
+                                    onClick = {
+                                        showUserMenu = false
+                                        onLogout()
+                                    }
+                                )
+                            }
+                        }
+                    },
                     scrollBehavior = scrollBehavior,
                     colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
                         containerColor = MaterialTheme.colorScheme.background
@@ -205,20 +239,30 @@ fun HomeScreen() {
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 item {
-                    // Date section
-                    Column(
+                    // Welcome Section
+                    Card(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalAlignment = Alignment.Start
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer
+                        ),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
                     ) {
-                        Text(
-                            text = dayOfWeek,
-                            style = MaterialTheme.typography.bodyLarge
-                        )
-                        Text(
-                            text = "${today.dayOfMonth} $monthName ${today.year}",
-                            style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Column(
+                            modifier = Modifier.padding(20.dp)
+                        ) {
+                            Text(
+                                text = "Welcome back, ${currentUser?.name?.split(" ")?.firstOrNull() ?: "User"}!",
+                                style = MaterialTheme.typography.headlineSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                            Text(
+                                text = "$dayOfWeek, ${today.dayOfMonth} $monthName ${today.year}",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
+                                modifier = Modifier.padding(top = 4.dp)
+                            )
+                        }
                     }
                 }
                 
@@ -253,22 +297,18 @@ fun HomeScreen() {
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        FilterButton(
-                            modifier = Modifier.weight(1f),
-                            tasks = tasks,
-                            onFiltered = { filtered, status, tag, isNameSortAscending, isDeadlineSortAscending, sortOption ->
-                                filteredTasks = filtered
-                                statusFilter = status
-                                tagFilter = tag
-                                isNameSortAscendingSort = isNameSortAscending
-                                isDeadlineSortAscendingSort = isDeadlineSortAscending
-                                selectedSortOption = sortOption
+                        FilterChip(
+                            onClick = { showSortFilterDialog = true },
+                            label = { Text("Filter & Sort") },
+                            selected = statusFilter != "All" || tagFilter != "All",
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Outlined.FilterAlt,
+                                    contentDescription = "Filter",
+                                    modifier = Modifier.size(18.dp)
+                                )
                             },
-                            currentStatusFilter = statusFilter,
-                            currentTagFilter = tagFilter,
-                            isNameSortAscending = isNameSortAscendingSort,
-                            isDeadlineSortAscending = isDeadlineSortAscendingSort,
-                            currentSortOption = selectedSortOption
+                            modifier = Modifier.weight(1f)
                         )
                         
                         // Add button with updated onClick to show CreateTaskScreen
@@ -334,13 +374,13 @@ fun HomeScreen() {
                     }
                 } else {
                     items(filteredTasks) { task ->
-                        TaskItem(
+                        TaskCard(
                             task = task,
                             onClick = {
                                 selectedTask = task
                                 showTaskDetailScreen = true
                             },
-                            onDelete = {
+                            onDeleteClick = {
                                 taskToDelete = task
                                 showDeleteDialog = true
                             }
@@ -349,24 +389,19 @@ fun HomeScreen() {
                 }
             }
 
-            // Add this to show the dialog when showSortFilterDialog is true
+            // Sort and Filter Dialog
             if (showSortFilterDialog) {
                 SortFilterDialog(
                     onDismiss = { showSortFilterDialog = false },
-                    onApply = { status, tag, isNameSortAscending, isDeadlineSortAscending, sortOption ->
-                        statusFilter = status
-                        tagFilter = tag
-                        isNameSortAscendingSort = isNameSortAscending
-                        isDeadlineSortAscendingSort = isDeadlineSortAscending
-                        selectedSortOption = sortOption
-                        
-                        // Apply filters and sorting
-                        filteredTasks = applyFilters(tasks, status, tag, isNameSortAscending, isDeadlineSortAscending, sortOption)
-                        
-                        // Close the dialog after applying the filter/sort
+                    onApply = { newStatusFilter, newTagFilter, newIsNameSortAscending, newIsDeadlineSortAscending, newSortOption ->
+                        statusFilter = newStatusFilter
+                        tagFilter = newTagFilter
+                        selectedSortOption = newSortOption
+                        isNameSortAscendingSort = newIsNameSortAscending
+                        isDeadlineSortAscendingSort = newIsDeadlineSortAscending
                         showSortFilterDialog = false
                     },
-                    tasks = tasks,
+                    tasks = allTasks,
                     currentStatusFilter = statusFilter,
                     currentTagFilter = tagFilter,
                     isNameSortAscending = isNameSortAscendingSort,
@@ -392,10 +427,9 @@ fun HomeScreen() {
                     confirmButton = {
                         TextButton(
                             onClick = {
-                                tasks = tasks.filter { it.id != taskToDelete?.id }
-                                taskToDelete?.let { deleteTask(context, it) }
-                                // Update filtered tasks after deleting a task
-                                filteredTasks = applyFilters(tasks, statusFilter, tagFilter, isNameSortAscendingSort, isDeadlineSortAscendingSort, selectedSortOption)
+                                taskToDelete?.let { task ->
+                                    taskViewModel.deleteTask(task, currentUserId)
+                                }
                                 showDeleteDialog = false
                                 taskToDelete = null
                             },
@@ -422,8 +456,8 @@ fun HomeScreen() {
     }
 }
 
-// Helper function to apply filters and sorting
-private fun applyFilters(
+// Helper function to apply filters and sorting - renamed to avoid conflicts
+private fun applyTaskFilters(
     tasks: List<Task>,
     status: String,
     tag: String,
@@ -514,8 +548,8 @@ fun FilterButton(
         SortFilterDialog(
             onDismiss = { showDialog = false },
             onApply = { status, tag, isNameSortAsc, isDeadlineSortAsc, sortOption ->
-                // Apply filters and sorting directly using the applyFilters function
-                val filtered = applyFilters(
+                // Apply filters and sorting directly using the applyTaskFilters function
+                val filtered = applyTaskFilters(
                     tasks, 
                     status, 
                     tag, 
@@ -595,7 +629,12 @@ fun SortFilterDialog(
     
     // Get available tags from all tasks
     val uniqueTags = remember(tasks) {
-        val allTags = tasks?.flatMap { it.tags }?.distinct()?.sorted() ?: listOf("Campus", "PPB", "PPL")
+        val allTasks = tasks ?: emptyList()
+        val allTags = if (allTasks.isNotEmpty()) {
+            allTasks.flatMap { it.tags }.distinct().sorted()
+        } else {
+            listOf("Campus", "PPB", "PPL")
+        }
         listOf("All") + allTags
     }
     
@@ -778,10 +817,10 @@ fun SortFilterDialog(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TaskItem(
+fun TaskCard(
     task: Task,
     onClick: () -> Unit = {},
-    onDelete: () -> Unit = {}
+    onDeleteClick: () -> Unit = {}
 ) {
     Card(
         modifier = Modifier
@@ -864,7 +903,7 @@ fun TaskItem(
                 contentAlignment = Alignment.CenterEnd
             ) {
                 IconButton(
-                    onClick = onDelete,
+                    onClick = onDeleteClick,
                     modifier = Modifier.size(28.dp)
                 ) {
                     Icon(
