@@ -40,7 +40,6 @@ import com.example.gasnugas.ui.viewmodel.TaskViewModel
 @Composable
 fun HomeScreen(
     authViewModel: AuthViewModel,
-    onLogout: () -> Unit,
     taskViewModel: TaskViewModel = viewModel()
 ) {
     var showCreateTaskScreen by remember { mutableStateOf(false) }
@@ -53,7 +52,6 @@ fun HomeScreen(
     var isNameSortAscendingSort by remember { mutableStateOf(true) }
     var isDeadlineSortAscendingSort by remember { mutableStateOf(true) }
     var selectedSortOption by remember { mutableStateOf("Deadline") }
-    var showUserMenu by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
     // Get current user
@@ -165,61 +163,6 @@ fun HomeScreen(
                                     style = MaterialTheme.typography.headlineMedium,
                                     fontWeight = FontWeight.Bold,
                                     color = Color(0xFF6200EA) // Same color as DONE status
-                                )
-                            }
-                        }
-                    },
-                    actions = {
-                        // User menu
-                        Box {
-                            IconButton(onClick = { showUserMenu = true }) {
-                                Icon(
-                                    imageVector = Icons.Default.Person,
-                                    contentDescription = "User Menu",
-                                    tint = MaterialTheme.colorScheme.primary
-                                )
-                            }
-                            
-                            DropdownMenu(
-                                expanded = showUserMenu,
-                                onDismissRequest = { showUserMenu = false }
-                            ) {
-                                DropdownMenuItem(
-                                    text = { 
-                                        Column {
-                                            Text(
-                                                text = currentUser?.name ?: "",
-                                                style = MaterialTheme.typography.bodyMedium,
-                                                fontWeight = FontWeight.Medium
-                                            )
-                                            Text(
-                                                text = currentUser?.email ?: "",
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-                                        }
-                                    },
-                                    onClick = { }
-                                )
-                                HorizontalDivider()
-                                DropdownMenuItem(
-                                    text = { 
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.ExitToApp,
-                                                contentDescription = "Logout",
-                                                modifier = Modifier.size(18.dp)
-                                            )
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                            Text("Logout")
-                                        }
-                                    },
-                                    onClick = {
-                                        showUserMenu = false
-                                        onLogout()
-                                    }
                                 )
                             }
                         }
