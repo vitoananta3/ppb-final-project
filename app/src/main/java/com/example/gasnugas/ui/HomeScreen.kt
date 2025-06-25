@@ -40,11 +40,13 @@ import com.example.gasnugas.ui.viewmodel.TaskViewModel
 @Composable
 fun HomeScreen(
     authViewModel: AuthViewModel,
+    navController: androidx.navigation.NavController,
     taskViewModel: TaskViewModel = viewModel()
 ) {
-    var showCreateTaskScreen by remember { mutableStateOf(false) }
-    var showTaskDetailScreen by remember { mutableStateOf(false) }
-    var selectedTask by remember { mutableStateOf<Task?>(null) }
+    // Remove these state variables since we'll use navigation instead
+    // var showCreateTaskScreen by remember { mutableStateOf(false) }
+    // var showTaskDetailScreen by remember { mutableStateOf(false) }
+    // var selectedTask by remember { mutableStateOf<Task?>(null) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var taskToDelete by remember { mutableStateOf<Task?>(null) }
     var statusFilter by remember { mutableStateOf("All") }
@@ -76,56 +78,7 @@ fun HomeScreen(
 
     var showSortFilterDialog by remember { mutableStateOf(false) }
 
-    if (showCreateTaskScreen) {
-        CreateTaskScreen(
-            onNavigateBack = { showCreateTaskScreen = false },
-            onCreateTask = { name, date, status, tags ->
-                val taskStatus = when (status) {
-                    "Backlog" -> TaskStatus.BACKLOG
-                    "In Progress" -> TaskStatus.IN_PROGRESS
-                    "Done" -> TaskStatus.DONE
-                    else -> TaskStatus.BACKLOG
-                }
-                
-                val newTask = Task(
-                    id = 0, // Room will auto-generate
-                    title = name,
-                    date = date ?: LocalDate.now(),
-                    tags = tags,
-                    status = taskStatus
-                )
-                
-                taskViewModel.insertTask(newTask, currentUserId)
-            }
-        )
-    } else if (showTaskDetailScreen && selectedTask != null) {
-        TaskDetailScreen(
-            task = selectedTask,
-            onNavigateBack = { 
-                showTaskDetailScreen = false 
-                selectedTask = null
-            },
-            onSaveTask = { name, date, status, tags ->
-                selectedTask?.let { task ->
-                    val taskStatus = when (status) {
-                        "Backlog" -> TaskStatus.BACKLOG
-                        "In Progress" -> TaskStatus.IN_PROGRESS
-                        "Done" -> TaskStatus.DONE
-                        else -> TaskStatus.BACKLOG
-                    }
-
-                    val updatedTask = task.copy(
-                        title = name,
-                        date = date ?: task.date,
-                        tags = tags,
-                        status = taskStatus
-                    )
-                    
-                    taskViewModel.updateTask(updatedTask, currentUserId)
-                }
-            }
-        )
-    } else {
+    // Remove conditional rendering - now using navigation
         val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
         
         Scaffold(
@@ -254,11 +207,11 @@ fun HomeScreen(
                             modifier = Modifier.weight(1f)
                         )
                         
-                        // Add button with updated onClick to show CreateTaskScreen
+                        // Add button with updated onClick to navigate to CreateTaskScreen
                         Card(
                             modifier = Modifier
                                 .size(48.dp)
-                                .clickable { showCreateTaskScreen = true },
+                                .clickable { navController.navigate("create_task") },
                             shape = RoundedCornerShape(8.dp),
                             colors = CardDefaults.cardColors(
                                 containerColor = MaterialTheme.colorScheme.surface
@@ -320,8 +273,7 @@ fun HomeScreen(
                         TaskCard(
                             task = task,
                             onClick = {
-                                selectedTask = task
-                                showTaskDetailScreen = true
+                                navController.navigate("task_detail/${task.id}")
                             },
                             onDeleteClick = {
                                 taskToDelete = task
@@ -397,7 +349,6 @@ fun HomeScreen(
             }
         }
     }
-}
 
 // Helper function to apply filters and sorting - renamed to avoid conflicts
 private fun applyTaskFilters(

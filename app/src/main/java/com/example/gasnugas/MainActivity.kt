@@ -18,16 +18,23 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.gasnugas.ui.HomeScreen
 import com.example.gasnugas.ui.ProfileScreen
+import com.example.gasnugas.ui.TaskDetailScreen
+import com.example.gasnugas.ui.CreateTaskScreen
+import com.example.gasnugas.ui.Task
+import com.example.gasnugas.ui.TaskStatus
 import com.example.gasnugas.ui.auth.AuthViewModel
 import com.example.gasnugas.ui.auth.LoginScreen
 import com.example.gasnugas.ui.auth.RegisterScreen
 import com.example.gasnugas.ui.theme.GasnugasTheme
+import com.example.gasnugas.ui.viewmodel.TaskViewModel
+import java.time.LocalDate
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -140,39 +147,50 @@ fun MainScreenWithBottomNav(
         )
     )
     
+    // Get current route to conditionally show bottom navigation
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = navBackStackEntry?.destination?.route
+    
+    // Routes where bottom navigation should be hidden
+    val routesWithoutBottomNav = setOf("task_detail/{taskId}", "create_task")
+    val shouldShowBottomNav = !routesWithoutBottomNav.any { route ->
+        currentRoute?.startsWith(route.substringBefore("{")) == true
+    }
+    
     Scaffold(
         bottomBar = {
-            NavigationBar(
-                containerColor = MaterialTheme.colorScheme.surface,
-                tonalElevation = 8.dp
-            ) {
-                val navBackStackEntry by navController.currentBackStackEntryAsState()
-                val currentDestination = navBackStackEntry?.destination
-                
-                bottomNavItems.forEach { item ->
-                    NavigationBarItem(
-                        icon = {
-                            Icon(
-                                imageVector = if (currentDestination?.hierarchy?.any { it.route == item.route } == true) {
-                                    item.selectedIcon
-                                } else {
-                                    item.unselectedIcon
-                                },
-                                contentDescription = item.title
-                            )
-                        },
-                        label = { Text(item.title) },
-                        selected = currentDestination?.hierarchy?.any { it.route == item.route } == true,
-                        onClick = {
-                            navController.navigate(item.route) {
-                                popUpTo(navController.graph.findStartDestination().id) {
-                                    saveState = true
+            if (shouldShowBottomNav) {
+                NavigationBar(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 8.dp
+                ) {
+                    val currentDestination = navBackStackEntry?.destination
+                    
+                    bottomNavItems.forEach { item ->
+                        NavigationBarItem(
+                            icon = {
+                                Icon(
+                                    imageVector = if (currentDestination?.hierarchy?.any { it.route == item.route } == true) {
+                                        item.selectedIcon
+                                    } else {
+                                        item.unselectedIcon
+                                    },
+                                    contentDescription = item.title
+                                )
+                            },
+                            label = { Text(item.title) },
+                            selected = currentDestination?.hierarchy?.any { it.route == item.route } == true,
+                            onClick = {
+                                navController.navigate(item.route) {
+                                    popUpTo(navController.graph.findStartDestination().id) {
+                                        saveState = true
+                                    }
+                                    launchSingleTop = true
+                                    restoreState = true
                                 }
-                                launchSingleTop = true
-                                restoreState = true
                             }
-                        }
-                    )
+                        )
+                    }
                 }
             }
         }
@@ -183,7 +201,10 @@ fun MainScreenWithBottomNav(
             modifier = Modifier.padding(paddingValues)
         ) {
             composable("home") {
-                HomeScreen(authViewModel = authViewModel)
+                HomeScreen(
+                    authViewModel = authViewModel,
+                    navController = navController
+                )
             }
             
             composable("profile") {
@@ -192,6 +213,92 @@ fun MainScreenWithBottomNav(
                     onLogout = onLogout
                 )
             }
+            
+            composable("task_detail/{taskId}") { backStackEntry ->
+                val taskId = backStackEntry.arguments?.getString("taskId")?.toIntOrNull()
+                TaskDetailScreenWrapper(
+                    taskId = taskId,
+                    authViewModel = authViewModel,
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
+            
+            composable("create_task") {
+                CreateTaskScreenWrapper(
+                    authViewModel = authViewModel,
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
         }
     }
+}
+
+@Composable
+fun TaskDetailScreenWrapper(
+    taskId: Int?,
+    authViewModel: AuthViewModel,
+    onNavigateBack: () -> Unit
+) {
+    val taskViewModel: TaskViewModel = viewModel()
+    val currentUser by authViewModel.currentUser.collectAsState(initial = null)
+    val currentUserId = currentUser?.id ?: return
+    
+    val allTasks by taskViewModel.getTasksByUser(currentUserId).collectAsState(initial = emptyList())
+    val task = allTasks.find { it.id == taskId }
+    
+    TaskDetailScreen(
+        task = task,
+        onNavigateBack = onNavigateBack,
+        onSaveTask = { name, date, status, tags ->
+            task?.let { existingTask ->
+                val taskStatus = when (status) {
+                    "Backlog" -> TaskStatus.BACKLOG
+                    "In Progress" -> TaskStatus.IN_PROGRESS
+                    "Done" -> TaskStatus.DONE
+                    else -> TaskStatus.BACKLOG
+                }
+
+                val updatedTask = existingTask.copy(
+                    title = name,
+                    date = date ?: existingTask.date,
+                    tags = tags,
+                    status = taskStatus
+                )
+                
+                taskViewModel.updateTask(updatedTask, currentUserId)
+            }
+        }
+    )
+}
+
+@Composable
+fun CreateTaskScreenWrapper(
+    authViewModel: AuthViewModel,
+    onNavigateBack: () -> Unit
+) {
+    val taskViewModel: TaskViewModel = viewModel()
+    val currentUser by authViewModel.currentUser.collectAsState(initial = null)
+    val currentUserId = currentUser?.id ?: return
+    
+    CreateTaskScreen(
+        onNavigateBack = onNavigateBack,
+        onCreateTask = { name, date, status, tags ->
+            val taskStatus = when (status) {
+                "Backlog" -> TaskStatus.BACKLOG
+                "In Progress" -> TaskStatus.IN_PROGRESS
+                "Done" -> TaskStatus.DONE
+                else -> TaskStatus.BACKLOG
+            }
+            
+            val newTask = Task(
+                id = 0, // Room will auto-generate
+                title = name,
+                date = date ?: LocalDate.now(),
+                tags = tags,
+                status = taskStatus
+            )
+            
+            taskViewModel.insertTask(newTask, currentUserId)
+        }
+    )
 }
