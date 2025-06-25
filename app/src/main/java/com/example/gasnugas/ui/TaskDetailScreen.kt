@@ -29,10 +29,10 @@ fun TaskDetailScreen(
     onNavigateBack: () -> Unit,
     onSaveTask: (String, LocalDate?, String, List<String>) -> Unit
 ) {
-    var taskName by remember { mutableStateOf(task?.title ?: "") }
-    var selectedDate by remember { mutableStateOf<LocalDate?>(task?.date) }
+    var taskName by remember(task) { mutableStateOf(task?.title ?: "") }
+    var selectedDate by remember(task) { mutableStateOf<LocalDate?>(task?.date) }
     var showDatePicker by remember { mutableStateOf(false) }
-    var selectedStatus by remember { mutableStateOf(
+    var selectedStatus by remember(task) { mutableStateOf(
         when(task?.status) {
             TaskStatus.BACKLOG -> "Backlog"
             TaskStatus.IN_PROGRESS -> "In Progress"
@@ -42,7 +42,7 @@ fun TaskDetailScreen(
     ) }
     
     // Changed from single tag to tag list
-    var tags by remember { mutableStateOf(task?.tags ?: emptyList()) }
+    var tags by remember(task) { mutableStateOf(task?.tags ?: emptyList()) }
     var newTagText by remember { mutableStateOf("") }
     
     // Status dropdown states
@@ -302,4 +302,4 @@ fun rememberDatePickerState(initialSelectedDateMillis: Long? = null): DatePicker
             locale = Locale.ENGLISH
         )
     }
-} 
+}
