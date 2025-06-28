@@ -9,5 +9,5 @@
 
 | Nama | Tugas |
 | --- | --- |
-| Ahmad Fauzan Alghifari | CRUD Task |
-| Vito Febrian Ananta | Auth + Sort & Filter |
+| Ahmad Fauzan Alghifari | (**50%**) CRUD Task |
+| Vito Febrian Ananta | (**50%**) Auth + Sort & Filter |
